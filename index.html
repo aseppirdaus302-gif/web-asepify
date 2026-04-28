@@ -1,0 +1,900 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>Asep Player</title>
+  <link rel="manifest" href="manifest.json" />
+  <meta name="theme-color" content="#0a0a0f" />
+  <meta name="apple-mobile-web-app-capable" content="yes" />
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+  <meta name="apple-mobile-web-app-title" content="Waveline" />
+  <link rel="apple-touch-icon" href="icons/icon-192.png" />
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Syne:wght@400;600;700;800&family=Space+Mono:ital,wght@0,400;0,700;1,400&display=swap" rel="stylesheet" />
+  <style>
+    /* ─── CSS Variables ─────────────────────────────── */
+    :root {
+      --bg:        #0a0a0f;
+      --surface:   #12121a;
+      --panel:     #1a1a28;
+      --border:    rgba(255,255,255,0.07);
+      --accent:    #00e5a0;
+      --accent2:   #7b5cf0;
+      --text:      #f0f0f5;
+      --muted:     #6b6b85;
+      --track-bg:  #252535;
+      --radius:    16px;
+      --radius-sm: 8px;
+      --font-head: 'Syne', sans-serif;
+      --font-mono: 'Space Mono', monospace;
+    }
+
+    /* ─── Reset & Base ──────────────────────────────── */
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    html { height: 100%; }
+
+    body {
+      min-height: 100%;
+      background: var(--bg);
+      color: var(--text);
+      font-family: var(--font-head);
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      padding: 24px 16px 40px;
+      overflow-x: hidden;
+    }
+
+    /* ─── Ambient background orbs ───────────────────── */
+    body::before {
+      content: '';
+      position: fixed;
+      top: -20%;
+      left: -10%;
+      width: 60vw;
+      height: 60vw;
+      background: radial-gradient(circle, rgba(123,92,240,.18) 0%, transparent 70%);
+      pointer-events: none;
+      z-index: 0;
+    }
+    body::after {
+      content: '';
+      position: fixed;
+      bottom: -10%;
+      right: -10%;
+      width: 50vw;
+      height: 50vw;
+      background: radial-gradient(circle, rgba(0,229,160,.12) 0%, transparent 70%);
+      pointer-events: none;
+      z-index: 0;
+    }
+
+    /* ─── Install Banner ────────────────────────────── */
+    #install-banner {
+      display: none;
+      position: fixed;
+      bottom: 20px;
+      left: 50%;
+      transform: translateX(-50%);
+      background: var(--panel);
+      border: 1px solid var(--accent);
+      border-radius: 50px;
+      padding: 12px 20px;
+      font-size: 13px;
+      font-family: var(--font-mono);
+      color: var(--accent);
+      gap: 12px;
+      align-items: center;
+      z-index: 9999;
+      box-shadow: 0 0 30px rgba(0,229,160,.2);
+      white-space: nowrap;
+    }
+    #install-banner.show { display: flex; }
+    #install-btn {
+      background: var(--accent);
+      color: #000;
+      border: none;
+      border-radius: 50px;
+      padding: 6px 14px;
+      font-family: var(--font-mono);
+      font-size: 12px;
+      font-weight: 700;
+      cursor: pointer;
+      letter-spacing: .05em;
+    }
+    #dismiss-btn {
+      background: none;
+      border: none;
+      color: var(--muted);
+      cursor: pointer;
+      font-size: 18px;
+      line-height: 1;
+      padding: 0 2px;
+    }
+
+    /* ─── App Container ─────────────────────────────── */
+    .app {
+      position: relative;
+      z-index: 1;
+      width: 100%;
+      max-width: 760px;
+      display: grid;
+      grid-template-columns: 1fr;
+      gap: 20px;
+    }
+
+    /* ─── Header ─────────────────────────────────────── */
+    header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 0 4px;
+    }
+    .logo {
+      font-size: 22px;
+      font-weight: 800;
+      letter-spacing: -.03em;
+      color: var(--text);
+    }
+    .logo span { color: var(--accent); }
+    .pwa-status {
+      font-family: var(--font-mono);
+      font-size: 11px;
+      color: var(--muted);
+      border: 1px solid var(--border);
+      border-radius: 50px;
+      padding: 4px 10px;
+    }
+
+    /* ─── Player Card ────────────────────────────────── */
+    .player-card {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 24px;
+      overflow: hidden;
+      position: relative;
+    }
+
+    /* artwork band */
+    .artwork-area {
+      position: relative;
+      width: 100%;
+      padding-top: 56.25%; /* 16:9 */
+      overflow: hidden;
+      background: var(--panel);
+    }
+    .artwork-area img {
+      position: absolute;
+      inset: 0;
+      width: 100%;
+      height: 100%;
+      object-fit: cover;
+      transition: opacity .6s ease, transform .6s ease;
+    }
+    .artwork-area img.changing {
+      opacity: 0;
+      transform: scale(1.04);
+    }
+    .artwork-overlay {
+      position: absolute;
+      inset: 0;
+      background: linear-gradient(to bottom, transparent 40%, var(--surface) 100%);
+    }
+    .now-badge {
+      position: absolute;
+      top: 16px;
+      left: 16px;
+      background: rgba(0,0,0,.55);
+      backdrop-filter: blur(10px);
+      border: 1px solid var(--border);
+      border-radius: 50px;
+      font-family: var(--font-mono);
+      font-size: 10px;
+      letter-spacing: .1em;
+      color: var(--accent);
+      padding: 5px 12px;
+      text-transform: uppercase;
+    }
+
+    /* song info */
+    .song-info {
+      padding: 20px 24px 0;
+    }
+    .song-title {
+      font-size: clamp(20px, 4vw, 28px);
+      font-weight: 800;
+      letter-spacing: -.02em;
+      line-height: 1.1;
+      color: var(--text);
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+    .song-artist {
+      font-family: var(--font-mono);
+      font-size: 13px;
+      color: var(--accent);
+      margin-top: 6px;
+      letter-spacing: .04em;
+    }
+
+    /* progress */
+    .progress-area {
+      padding: 20px 24px 0;
+    }
+    .progress-bar-wrap {
+      position: relative;
+      height: 6px;
+      background: var(--track-bg);
+      border-radius: 50px;
+      cursor: pointer;
+      overflow: hidden;
+    }
+    .progress-bar-fill {
+      height: 100%;
+      background: linear-gradient(90deg, var(--accent2), var(--accent));
+      border-radius: 50px;
+      width: 0%;
+      transition: width .2s linear;
+      pointer-events: none;
+    }
+    .progress-bar-wrap:hover .progress-bar-fill {
+      box-shadow: 0 0 10px var(--accent);
+    }
+    .time-row {
+      display: flex;
+      justify-content: space-between;
+      font-family: var(--font-mono);
+      font-size: 11px;
+      color: var(--muted);
+      margin-top: 8px;
+    }
+
+    /* controls */
+    .controls {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 12px;
+      padding: 20px 24px;
+    }
+    .ctrl-btn {
+      background: none;
+      border: none;
+      cursor: pointer;
+      color: var(--text);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      border-radius: 50%;
+      transition: color .2s, transform .15s, background .2s;
+      padding: 8px;
+    }
+    .ctrl-btn:hover {
+      color: var(--accent);
+      transform: scale(1.12);
+    }
+    .ctrl-btn:active { transform: scale(.93); }
+    .ctrl-btn svg { display: block; }
+
+    .play-btn {
+      background: linear-gradient(135deg, var(--accent2), var(--accent));
+      border-radius: 50%;
+      width: 60px;
+      height: 60px;
+      box-shadow: 0 0 28px rgba(0,229,160,.35);
+      transition: box-shadow .2s, transform .15s;
+    }
+    .play-btn:hover {
+      box-shadow: 0 0 40px rgba(0,229,160,.55);
+      color: #fff;
+      transform: scale(1.08);
+    }
+    .play-btn svg { width: 28px; height: 28px; }
+
+    /* volume */
+    .volume-row {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      padding: 0 24px 24px;
+    }
+    .volume-row svg { color: var(--muted); flex-shrink: 0; }
+    input[type=range] {
+      -webkit-appearance: none;
+      appearance: none;
+      flex: 1;
+      height: 4px;
+      border-radius: 50px;
+      background: var(--track-bg);
+      outline: none;
+      cursor: pointer;
+    }
+    input[type=range]::-webkit-slider-thumb {
+      -webkit-appearance: none;
+      appearance: none;
+      width: 14px;
+      height: 14px;
+      border-radius: 50%;
+      background: var(--accent);
+      box-shadow: 0 0 8px var(--accent);
+      cursor: pointer;
+    }
+    input[type=range]::-moz-range-thumb {
+      width: 14px;
+      height: 14px;
+      border-radius: 50%;
+      background: var(--accent);
+      border: none;
+      cursor: pointer;
+    }
+
+    /* ─── Playlist ───────────────────────────────────── */
+    .playlist-card {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      overflow: hidden;
+    }
+    .playlist-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 16px 20px;
+      border-bottom: 1px solid var(--border);
+    }
+    .playlist-header h2 {
+      font-size: 13px;
+      font-weight: 700;
+      letter-spacing: .08em;
+      text-transform: uppercase;
+      color: var(--muted);
+    }
+    .track-count {
+      font-family: var(--font-mono);
+      font-size: 11px;
+      color: var(--muted);
+    }
+    .playlist-list {
+      list-style: none;
+    }
+    .playlist-item {
+      display: flex;
+      align-items: center;
+      gap: 14px;
+      padding: 12px 20px;
+      cursor: pointer;
+      border-bottom: 1px solid var(--border);
+      transition: background .15s;
+      position: relative;
+    }
+    .playlist-item:last-child { border-bottom: none; }
+    .playlist-item:hover { background: rgba(255,255,255,.04); }
+    .playlist-item.active {
+      background: rgba(0,229,160,.07);
+    }
+    .playlist-item.active::before {
+      content: '';
+      position: absolute;
+      left: 0;
+      top: 0;
+      bottom: 0;
+      width: 3px;
+      background: var(--accent);
+      border-radius: 0 3px 3px 0;
+    }
+    .track-thumb {
+      width: 46px;
+      height: 46px;
+      border-radius: var(--radius-sm);
+      object-fit: cover;
+      flex-shrink: 0;
+      background: var(--panel);
+    }
+    .track-info { flex: 1; min-width: 0; }
+    .track-name {
+      font-size: 14px;
+      font-weight: 700;
+      color: var(--text);
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+    .playlist-item.active .track-name { color: var(--accent); }
+    .track-artist {
+      font-family: var(--font-mono);
+      font-size: 11px;
+      color: var(--muted);
+      margin-top: 3px;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+    .track-num {
+      font-family: var(--font-mono);
+      font-size: 12px;
+      color: var(--muted);
+      min-width: 22px;
+      text-align: right;
+    }
+    .track-playing-icon {
+      display: none;
+      gap: 3px;
+      align-items: flex-end;
+      height: 16px;
+    }
+    .playlist-item.active .track-playing-icon { display: flex; }
+    .playlist-item.active .track-num { display: none; }
+    .bar {
+      width: 3px;
+      background: var(--accent);
+      border-radius: 2px;
+      animation: bounce 1s ease-in-out infinite alternate;
+    }
+    .bar:nth-child(1) { height: 8px;  animation-delay: 0s; }
+    .bar:nth-child(2) { height: 14px; animation-delay: .15s; }
+    .bar:nth-child(3) { height: 10px; animation-delay: .3s; }
+    @keyframes bounce {
+      from { transform: scaleY(.4); }
+      to   { transform: scaleY(1); }
+    }
+    .paused .bar { animation-play-state: paused; }
+
+    /* ─── Responsive ─────────────────────────────────── */
+    @media (min-width: 600px) {
+      .app {
+        grid-template-columns: 1fr 1fr;
+      }
+      .player-card { grid-column: 1 / -1; }
+      .artwork-area { padding-top: 42%; }
+    }
+
+    @media (min-width: 760px) {
+      .app {
+        grid-template-columns: 1.1fr 0.9fr;
+        align-items: start;
+      }
+      .player-card { grid-column: 1; }
+      .playlist-card { grid-column: 2; }
+    }
+  </style>
+</head>
+<body>
+
+<!-- PWA Install Banner -->
+<div id="install-banner">
+  <span>📲 Add Asepify to Home Screen</span>
+  <button id="install-btn">Install</button>
+  <button id="dismiss-btn">✕</button>
+</div>
+
+<div class="app">
+
+  <!-- Header -->
+  <header style="grid-column: 1 / -1;">
+    <div class="logo">Asep<span>ify</span></div>
+    <div class="pwa-status" id="pwa-status">PWA Ready</div>
+  </header>
+
+  <!-- Player Card -->
+  <div class="player-card">
+
+    <!-- Artwork -->
+    <div class="artwork-area">
+      <img id="cover-img" src="" alt="Album Art" />
+      <div class="artwork-overlay"></div>
+      <div class="now-badge">▶ NOW PLAYING</div>
+    </div>
+
+    <!-- Song Info -->
+    <div class="song-info">
+      <div class="song-title" id="song-title">Loading…</div>
+      <div class="song-artist" id="song-artist">—</div>
+    </div>
+
+    <!-- Progress -->
+    <div class="progress-area">
+      <div class="progress-bar-wrap" id="progress-bar">
+        <div class="progress-bar-fill" id="progress-fill"></div>
+      </div>
+      <div class="time-row">
+        <span id="current-time">0:00</span>
+        <span id="duration">0:00</span>
+      </div>
+    </div>
+
+    <!-- Controls -->
+    <div class="controls">
+      <!-- Prev -->
+      <button class="ctrl-btn" id="btn-prev" title="Previous" aria-label="Previous">
+        <svg width="22" height="22" viewBox="0 0 24 24" fill="currentColor">
+          <path d="M6 6h2v12H6zm3.5 6 8.5 6V6z"/>
+        </svg>
+      </button>
+
+      <!-- Play/Pause -->
+      <button class="ctrl-btn play-btn" id="btn-play" title="Play/Pause" aria-label="Play">
+        <svg id="icon-play" viewBox="0 0 24 24" fill="currentColor">
+          <path d="M8 5v14l11-7z"/>
+        </svg>
+        <svg id="icon-pause" viewBox="0 0 24 24" fill="currentColor" style="display:none;">
+          <path d="M6 19h4V5H6v14zm8-14v14h4V5h-4z"/>
+        </svg>
+      </button>
+
+      <!-- Next -->
+      <button class="ctrl-btn" id="btn-next" title="Next" aria-label="Next">
+        <svg width="22" height="22" viewBox="0 0 24 24" fill="currentColor">
+          <path d="M6 18l8.5-6L6 6v12zm2-8.14L11.03 12 8 14.14V9.86zM16 6h2v12h-2z"/>
+        </svg>
+      </button>
+    </div>
+
+    <!-- Volume -->
+    <div class="volume-row">
+      <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor">
+        <path d="M3 9v6h4l5 5V4L7 9H3zm13.5 3c0-1.77-1.02-3.29-2.5-4.03v8.05c1.48-.73 2.5-2.25 2.5-4.02z"/>
+      </svg>
+      <input type="range" id="volume-slider" min="0" max="1" step="0.01" value="0.8" aria-label="Volume" />
+      <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor">
+        <path d="M3 9v6h4l5 5V4L7 9H3zm13.5 3c0-1.77-1.02-3.29-2.5-4.03v8.05c1.48-.73 2.5-2.25 2.5-4.02zM14 3.23v2.06c2.89.86 5 3.54 5 6.71s-2.11 5.85-5 6.71v2.06c4.01-.91 7-4.49 7-8.77s-2.99-7.86-7-8.77z"/>
+      </svg>
+    </div>
+
+  </div><!-- /player-card -->
+
+  <!-- Playlist -->
+  <div class="playlist-card">
+    <div class="playlist-header">
+      <h2>Playlist</h2>
+      <span class="track-count" id="track-count">— tracks</span>
+    </div>
+    <ul class="playlist-list" id="playlist-list"></ul>
+  </div>
+
+</div><!-- /app -->
+
+<!-- Hidden audio element -->
+<audio id="audio-player" preload="auto"></audio>
+
+<script>
+/* ════════════════════════════════════════════
+   WAVELINE PLAYER — Pure JS Music Player
+   with PWA + Media Session API
+════════════════════════════════════════════ */
+
+// ── 1. SONG DATA ─────────────────────────────
+// Songs use free public-domain/CC0 audio from opengameart & freemusicarchive
+const songs = [
+  {
+    title:  "Shape of my heart",
+    artist: "Backstreet boys",
+    src:    "https://raw.githubusercontent.com/aseppirdaus302-gif/shape-of-my-heart/main/heart.mp3",
+    cover:  "somh.webp"
+  },
+  {
+    title:  "Dan",
+    artist: "Sheila on 7",
+    src:    "https://raw.githubusercontent.com/aseppirdaus302-gif/Dan/main/Dan.mp3",
+    cover:  "Sheila.webp"
+  },
+  {
+    title:  "Seharusnya",
+    artist: "Last child",
+    src:    "https://raw.githubusercontent.com/aseppirdaus302-gif/seharusnya/main/seharusnya.mp3",
+    cover:  "seharusnya.webp"
+  },
+  {
+    title:  "you'll be in my heart",
+    artist: "NIKI",
+    src:    "https://raw.githubusercontent.com/aseppirdaus302-gif/youll-be-in-my-heart/main/my-heart.mp3",
+    cover:  "Niki.webp"
+  },
+  {
+    title:  "Perfect",
+    artist: "One direction",
+    src:    "https://raw.githubusercontent.com/aseppirdaus302-gif/perpect/main/perfect.mp3",
+    cover:  "perfect-one.direction.webp"
+  },
+  
+  {
+    title:  "Kejar Mimpi",
+    artist: "Maudy ayunda",
+    src:    "https://raw.githubusercontent.com/aseppirdaus302-gif/kejar-mimpi/main/kejar-mimpi.mp3",
+    cover:  "maudy.webp"
+  },
+  
+    {
+    title:  "Ada titik titik diujung doa",
+    artist: "Sal priadi",
+    src:    "https://raw.githubusercontent.com/aseppirdaus302-gif/ujung-doa/main/ujung-doa.mp3",
+    cover:  "ujung-doa.webp"
+  },
+  
+  {
+    title:  "Perfect",
+    artist: "Ed sheeren",
+    src:    "https://raw.githubusercontent.com/aseppirdaus302-gif/perfect-sheeren/main/perfect-sheeren.mp3",
+    cover:  "perfect-sheeren.webp"
+  },
+  
+  {
+    title:  "About you",
+    artist: "The 1975",
+    src:    "https://raw.githubusercontent.com/aseppirdaus302-gif/about-you/main/about-you.mp3",
+    cover:  "about-you.webp"
+  }
+];
+
+// ── 2. STATE ──────────────────────────────────
+let currentIndex = 0;
+let isPlaying    = false;
+
+// ── 3. DOM REFS ───────────────────────────────
+const audio        = document.getElementById('audio-player');
+const coverImg     = document.getElementById('cover-img');
+const songTitle    = document.getElementById('song-title');
+const songArtist   = document.getElementById('song-artist');
+const progressBar  = document.getElementById('progress-bar');
+const progressFill = document.getElementById('progress-fill');
+const currentTime  = document.getElementById('current-time');
+const durationEl   = document.getElementById('duration');
+const btnPlay      = document.getElementById('btn-play');
+const iconPlay     = document.getElementById('icon-play');
+const iconPause    = document.getElementById('icon-pause');
+const btnPrev      = document.getElementById('btn-prev');
+const btnNext      = document.getElementById('btn-next');
+const volumeSlider = document.getElementById('volume-slider');
+const playlistList = document.getElementById('playlist-list');
+const trackCount   = document.getElementById('track-count');
+
+// ── 4. BUILD PLAYLIST UI ──────────────────────
+function buildPlaylist() {
+  trackCount.textContent = `${songs.length} tracks`;
+  playlistList.innerHTML = '';
+  songs.forEach((song, i) => {
+    const li = document.createElement('li');
+    li.className = 'playlist-item' + (i === currentIndex ? ' active' : '');
+    li.dataset.index = i;
+    li.innerHTML = `
+      <img class="track-thumb" src="${song.cover}" alt="" loading="lazy" />
+      <div class="track-info">
+        <div class="track-name">${song.title}</div>
+        <div class="track-artist">${song.artist}</div>
+      </div>
+      <div class="track-playing-icon" aria-hidden="true">
+        <div class="bar"></div><div class="bar"></div><div class="bar"></div>
+      </div>
+      <div class="track-num">${String(i + 1).padStart(2,'0')}</div>
+    `;
+    li.addEventListener('click', () => loadTrack(i, true));
+    playlistList.appendChild(li);
+  });
+}
+
+// ── 5. LOAD TRACK ─────────────────────────────
+function loadTrack(index, autoPlay = false) {
+  currentIndex = index;
+  const song = songs[index];
+
+  // Animate cover transition
+  coverImg.classList.add('changing');
+  setTimeout(() => {
+    coverImg.src = song.cover;
+    coverImg.classList.remove('changing');
+  }, 300);
+
+  songTitle.textContent  = song.title;
+  songArtist.textContent = song.artist;
+  audio.src              = song.src;
+  audio.volume           = volumeSlider.value;
+  audio.load();
+
+  // Update playlist highlight
+  document.querySelectorAll('.playlist-item').forEach((el, i) => {
+    el.classList.toggle('active', i === index);
+    const icon = el.querySelector('.track-playing-icon');
+    if (icon) icon.classList.toggle('paused', !autoPlay);
+  });
+
+  // Scroll active item into view
+  const activeItem = playlistList.querySelector('.playlist-item.active');
+  if (activeItem) activeItem.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+
+  if (autoPlay) {
+    audio.play().then(() => {
+      isPlaying = true;
+      updatePlayUI();
+    }).catch(() => {});
+  } else {
+    isPlaying = false;
+    updatePlayUI();
+  }
+
+  updateMediaSession(song);
+}
+
+// ── 6. PLAY / PAUSE ───────────────────────────
+function togglePlay() {
+  if (isPlaying) {
+    audio.pause();
+    isPlaying = false;
+    updatePlayUI();
+  } else {
+    audio.play().then(() => {
+      isPlaying = true;
+      updatePlayUI();
+    }).catch(err => console.warn('Playback blocked:', err));
+  }
+}
+
+function updatePlayUI() {
+  iconPlay.style.display  = isPlaying ? 'none'  : 'block';
+  iconPause.style.display = isPlaying ? 'block' : 'none';
+
+  // Animate playlist bars
+  document.querySelectorAll('.playlist-item.active .track-playing-icon').forEach(el => {
+    el.classList.toggle('paused', !isPlaying);
+  });
+}
+
+// ── 7. NEXT / PREV ───────────────────────────
+function nextTrack() {
+  const next = (currentIndex + 1) % songs.length;
+  loadTrack(next, isPlaying);
+}
+function prevTrack() {
+  // If more than 3s in, restart current track; otherwise go previous
+  if (audio.currentTime > 3) {
+    audio.currentTime = 0;
+  } else {
+    const prev = (currentIndex - 1 + songs.length) % songs.length;
+    loadTrack(prev, isPlaying);
+  }
+}
+
+// ── 8. AUTO-NEXT (the key feature!) ──────────
+// This is the heart of the auto-play-next feature.
+// The 'ended' event fires natively on the <audio> element
+// whenever a track finishes playing to its end.
+// We simply listen for it and call nextTrack().
+audio.addEventListener('ended', () => {
+  nextTrack(); // ← auto advances to next song
+});
+
+// ── 9. PROGRESS BAR ──────────────────────────
+audio.addEventListener('timeupdate', () => {
+  if (!audio.duration) return;
+  const pct = (audio.currentTime / audio.duration) * 100;
+  progressFill.style.width = pct + '%';
+  currentTime.textContent  = formatTime(audio.currentTime);
+  durationEl.textContent   = formatTime(audio.duration);
+
+  // Keep Media Session position in sync
+  if ('mediaSession' in navigator && navigator.mediaSession.setPositionState) {
+    try {
+      navigator.mediaSession.setPositionState({
+        duration:     audio.duration,
+        playbackRate: audio.playbackRate,
+        position:     audio.currentTime
+      });
+    } catch(_) {}
+  }
+});
+
+// Seek on progress bar click/drag
+progressBar.addEventListener('click', seek);
+progressBar.addEventListener('mousemove', e => { if (e.buttons === 1) seek(e); });
+function seek(e) {
+  const rect = progressBar.getBoundingClientRect();
+  const pct  = Math.max(0, Math.min(1, (e.clientX - rect.left) / rect.width));
+  audio.currentTime = pct * audio.duration;
+}
+
+// Touch seek
+progressBar.addEventListener('touchmove', e => {
+  e.preventDefault();
+  const touch = e.touches[0];
+  const rect  = progressBar.getBoundingClientRect();
+  const pct   = Math.max(0, Math.min(1, (touch.clientX - rect.left) / rect.width));
+  audio.currentTime = pct * audio.duration;
+}, { passive: false });
+
+// ── 10. VOLUME ────────────────────────────────
+volumeSlider.addEventListener('input', () => {
+  audio.volume = volumeSlider.value;
+});
+
+// ── 11. HELPER: formatTime ────────────────────
+function formatTime(secs) {
+  if (isNaN(secs)) return '0:00';
+  const m = Math.floor(secs / 60);
+  const s = Math.floor(secs % 60);
+  return `${m}:${s.toString().padStart(2,'0')}`;
+}
+
+// ── 12. MEDIA SESSION API ─────────────────────
+// Lets the OS lock screen, notification shade, AirPods,
+// Bluetooth remotes, and headset buttons control playback.
+function updateMediaSession(song) {
+  if (!('mediaSession' in navigator)) return;
+
+  navigator.mediaSession.metadata = new MediaMetadata({
+    title:  song.title,
+    artist: song.artist,
+    album:  'Asep Player',
+    artwork: [
+      { src: song.cover, sizes: '800x450', type: 'image/jpeg' }
+    ]
+  });
+
+  navigator.mediaSession.setActionHandler('play',          () => { audio.play(); isPlaying = true;  updatePlayUI(); });
+  navigator.mediaSession.setActionHandler('pause',         () => { audio.pause(); isPlaying = false; updatePlayUI(); });
+  navigator.mediaSession.setActionHandler('previoustrack', prevTrack);
+  navigator.mediaSession.setActionHandler('nexttrack',     nextTrack);
+  navigator.mediaSession.setActionHandler('seekto',        e  => { audio.currentTime = e.seekTime; });
+}
+
+// Sync mediaSession playback state
+audio.addEventListener('play',  () => { if ('mediaSession' in navigator) navigator.mediaSession.playbackState = 'playing'; });
+audio.addEventListener('pause', () => { if ('mediaSession' in navigator) navigator.mediaSession.playbackState = 'paused';  });
+
+// ── 13. BUTTON EVENT LISTENERS ───────────────
+btnPlay.addEventListener('click', togglePlay);
+btnNext.addEventListener('click', nextTrack);
+btnPrev.addEventListener('click', prevTrack);
+
+// Keyboard shortcuts
+document.addEventListener('keydown', e => {
+  if (e.target.tagName === 'INPUT') return;
+  if (e.code === 'Space')      { e.preventDefault(); togglePlay(); }
+  if (e.code === 'ArrowRight') nextTrack();
+  if (e.code === 'ArrowLeft')  prevTrack();
+});
+
+// ── 14. PWA INSTALL PROMPT ────────────────────
+let deferredPrompt = null;
+const installBanner = document.getElementById('install-banner');
+const installBtn    = document.getElementById('install-btn');
+const dismissBtn    = document.getElementById('dismiss-btn');
+
+window.addEventListener('beforeinstallprompt', e => {
+  e.preventDefault();
+  deferredPrompt = e;
+  installBanner.classList.add('show');
+});
+
+installBtn.addEventListener('click', async () => {
+  if (!deferredPrompt) return;
+  deferredPrompt.prompt();
+  const { outcome } = await deferredPrompt.userChoice;
+  deferredPrompt = null;
+  installBanner.classList.remove('show');
+  if (outcome === 'accepted') {
+    document.getElementById('pwa-status').textContent = '✓ Installed';
+  }
+});
+
+dismissBtn.addEventListener('click', () => installBanner.classList.remove('show'));
+
+window.addEventListener('appinstalled', () => {
+  document.getElementById('pwa-status').textContent = '✓ Installed';
+  installBanner.classList.remove('show');
+});
+
+// ── 15. SERVICE WORKER REGISTRATION ──────────
+if ('serviceWorker' in navigator) {
+  navigator.serviceWorker.register('sw.js')
+    .then(() => console.log('SW registered'))
+    .catch(err => console.warn('SW failed:', err));
+}
+
+// ── 16. INIT ──────────────────────────────────
+buildPlaylist();
+loadTrack(0, false);
+</script>
+</body>
+</html>
