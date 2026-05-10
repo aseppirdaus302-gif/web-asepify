@@ -1,6 +1,7 @@
 {
   "name": "Asep Player",
   "short_name": "Asepify",
+  "version": "2",
   "start_url": "index.html",
   "display": "standalone",
   "background_color": "#0a0a0f",
