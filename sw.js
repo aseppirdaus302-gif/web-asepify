@@ -3,7 +3,7 @@
  * Strategy: Cache-First for static assets, Network-First for audio
  */
 
-const CACHE_NAME    = 'waveline-v1';
+const CACHE_NAME    = 'waveline-v2';
 const STATIC_ASSETS = [
   '/',
   '/index.html',
